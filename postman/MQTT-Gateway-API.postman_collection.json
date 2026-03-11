@@ -1,0 +1,259 @@
+{
+  "info": {
+    "name": "MQTT Gateway API",
+    "description": "Postman collection for the FastAPI backend in this repo.\n\nImport this collection, then set the environment variables (baseUrl, settingsPin, dates, etc.).\n\nDocs:\n- Repo overview: README.md\n- Backend: backend_apis/README.md",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Latest data (snapshot)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/latest-data",
+              "host": ["{{baseUrl}}"],
+              "path": ["latest-data"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Settings",
+      "item": [
+        {
+          "name": "Verify settings PIN",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings/verify-pin",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings", "verify-pin"]
+            }
+          }
+        },
+        {
+          "name": "Get settings",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            }
+          }
+        },
+        {
+          "name": "Update settings (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mqtt\": {\n    \"host\": \"{{mqttHost}}\",\n    \"port\": {{mqttPort}},\n    \"username\": null,\n    \"password\": null,\n    \"client_id_prefix\": \"gateway_service\",\n    \"keepalive\": 60,\n    \"topic_pattern\": \"FM/#\",\n    \"qos\": 1\n  },\n  \"telemetry\": {\n    \"base_url\": \"{{tbBaseUrl}}\",\n    \"enable_push\": true,\n    \"enable_auto_push\": true,\n    \"timeout_seconds\": 5,\n    \"device_token\": null,\n    \"token_from_topic_regex\": null,\n    \"one_device_per_meter\": true,\n    \"push_interval_seconds\": 0,\n    \"inactivity_minutes\": 0,\n    \"inactivity_check_interval_seconds\": 60,\n    \"inactivity_timeout_seconds\": 60\n  },\n  \"thingsboard_download\": {\n    \"base_url\": \"{{tbBaseUrl}}\",\n    \"username\": \"{{tbUsername}}\",\n    \"password\": \"{{tbPassword}}\",\n    \"device_id\": \"{{tbDeviceId}}\",\n    \"device_ids\": [{{tbDeviceIdsArray}}],\n    \"timeout_seconds\": 30\n  }\n}\n"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["settings"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Device presets",
+      "item": [
+        {
+          "name": "List presets",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/device-presets",
+              "host": ["{{baseUrl}}"],
+              "path": ["device-presets"]
+            }
+          }
+        },
+        {
+          "name": "Create preset",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"{{presetName}}\",\n  \"device_ids\": [{{tbDeviceIdsArray}}],\n  \"keys\": \"flow_rate,total_consumption\"\n}\n"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/device-presets",
+              "host": ["{{baseUrl}}"],
+              "path": ["device-presets"]
+            }
+          }
+        },
+        {
+          "name": "Delete preset (by id)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/device-presets/{{presetId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["device-presets", "{{presetId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Daily consumption (JSON)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/daily-consumption?date={{reportDate}}&key=total_consumption&preset_id={{presetId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "daily-consumption"],
+              "query": [
+                { "key": "date", "value": "{{reportDate}}" },
+                { "key": "key", "value": "total_consumption" },
+                { "key": "preset_id", "value": "{{presetId}}", "disabled": true },
+                { "key": "device_ids", "value": "{{tbDeviceIdsCsv}}", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Daily consumption (CSV download)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/reports/daily-consumption-csv?start_date={{startDate}}&end_date={{endDate}}&key=total_consumption&preset_id={{presetId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["reports", "daily-consumption-csv"],
+              "query": [
+                { "key": "start_date", "value": "{{startDate}}" },
+                { "key": "end_date", "value": "{{endDate}}" },
+                { "key": "key", "value": "total_consumption" },
+                { "key": "preset_id", "value": "{{presetId}}", "disabled": true },
+                { "key": "device_ids", "value": "{{tbDeviceIdsCsv}}", "disabled": true }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Download",
+      "item": [
+        {
+          "name": "Latest snapshot (JSON file)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/download/latest-json",
+              "host": ["{{baseUrl}}"],
+              "path": ["download", "latest-json"]
+            }
+          }
+        },
+        {
+          "name": "Latest snapshot (CSV file)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/download/latest-csv",
+              "host": ["{{baseUrl}}"],
+              "path": ["download", "latest-csv"]
+            }
+          }
+        },
+        {
+          "name": "ThingsBoard download (CSV pivot)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/download/thingsboard?format=csv&layout=pivot&start_date={{startDate}}&end_date={{endDate}}&keys={{keys}}&device_ids={{tbDeviceIdsCsv}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["download", "thingsboard"],
+              "query": [
+                { "key": "format", "value": "csv" },
+                { "key": "layout", "value": "pivot" },
+                { "key": "start_date", "value": "{{startDate}}" },
+                { "key": "end_date", "value": "{{endDate}}" },
+                { "key": "keys", "value": "{{keys}}" },
+                { "key": "device_ids", "value": "{{tbDeviceIdsCsv}}" }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Telemetry push (manual)",
+      "item": [
+        {
+          "name": "Push latest (all gateways)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": {
+              "raw": "{{baseUrl}}/telemetry/push-latest",
+              "host": ["{{baseUrl}}"],
+              "path": ["telemetry", "push-latest"]
+            }
+          }
+        },
+        {
+          "name": "Push latest (selected gateway topics)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gateway_topics\": [\n    \"{{gatewayTopic}}\"\n  ]\n}\n"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/telemetry/push-latest",
+              "host": ["{{baseUrl}}"],
+              "path": ["telemetry", "push-latest"]
+            }
+          }
+        },
+        {
+          "name": "Push single gateway (by topic)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/gateways/{{gatewayTopic}}/push-telemetry",
+              "host": ["{{baseUrl}}"],
+              "path": ["gateways", "{{gatewayTopic}}", "push-telemetry"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+
