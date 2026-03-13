@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 
@@ -21,6 +22,21 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 # IST = UTC+5:30 (no DST). Use fixed offset so Windows works without tzdata.
 IST = timezone(timedelta(hours=5, minutes=30))
+
+# Optional max counter value for wrap-around meters.
+# If set (e.g. TOTAL_CONSUMPTION_MAX=1000), daily consumption will treat any
+# drop in the total_consumption counter as a wrap:
+#   usage_segment = (max_counter - prev) + current
+#
+# If not set, drops are still flagged via reset_detected but daily_consumption
+# falls back to 0 for safety (legacy behavior).
+try:
+    _MAX_COUNTER_RAW = os.getenv("TOTAL_CONSUMPTION_MAX")
+    MAX_COUNTER: Optional[float] = (
+        float(_MAX_COUNTER_RAW) if _MAX_COUNTER_RAW and float(_MAX_COUNTER_RAW) > 0 else None
+    )
+except Exception:
+    MAX_COUNTER = None
 
 
 def _utc_iso_to_ist_iso(utc_iso: Optional[str]) -> str:
@@ -65,7 +81,18 @@ class DailyConsumptionRow(BaseModel):
 
 @router.get("/daily-consumption", response_model=List[DailyConsumptionRow])
 def daily_consumption(
-    date: str = Query(..., description="Day to compute (YYYY-MM-DD), UTC day boundary."),
+    date: str = Query(..., description="Base day (YYYY-MM-DD) used for grouping."),
+    start_iso: Optional[str] = Query(
+        None,
+        description=(
+            "Optional ISO8601 start timestamp (UTC). "
+            "If provided together with end_iso, restricts the computation window."
+        ),
+    ),
+    end_iso: Optional[str] = Query(
+        None,
+        description="Optional ISO8601 end timestamp (UTC). Must be provided with start_iso.",
+    ),
     preset_id: Optional[int] = Query(
         None, description="Optional device preset id to use for device_ids/keys."
     ),
@@ -128,11 +155,39 @@ def daily_consumption(
             detail="No device IDs provided. Use device_ids query param, preset_id, or configure THINGSBOARD_DEVICE_IDS in Settings.",
         )
 
-    try:
-        start_ts = _parse_date_to_ts(date, end_of_day=False)
-        end_ts = _parse_date_to_ts(date, end_of_day=True)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid date format. {e!s}")
+    # Determine time window [start_ts, end_ts]
+    if start_iso or end_iso:
+        if not (start_iso and end_iso):
+            raise HTTPException(
+                status_code=400,
+                detail="Both start_iso and end_iso must be provided together.",
+            )
+        try:
+            s = start_iso.strip().replace("Z", "+00:00")
+            e = end_iso.strip().replace("Z", "+00:00")
+            s_dt = datetime.fromisoformat(s)
+            e_dt = datetime.fromisoformat(e)
+            if s_dt.tzinfo is None:
+                s_dt = s_dt.replace(tzinfo=timezone.utc)
+            if e_dt.tzinfo is None:
+                e_dt = e_dt.replace(tzinfo=timezone.utc)
+            start_ts = int(s_dt.timestamp() * 1000)
+            end_ts = int(e_dt.timestamp() * 1000)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid start_iso/end_iso format: {exc!s}",
+            )
+        if start_ts >= end_ts:
+            raise HTTPException(
+                status_code=400, detail="start_iso must be before end_iso"
+            )
+    else:
+        try:
+            start_ts = _parse_date_to_ts(date, end_of_day=False)
+            end_ts = _parse_date_to_ts(date, end_of_day=True)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid date format. {e!s}")
 
     # Login once
     try:
@@ -181,12 +236,18 @@ def daily_consumption(
             )
             continue
 
-        first = series[0]
-        last = series[-1]
-        try:
-            start_val = float(first.get("value"))
-            end_val = float(last.get("value"))
-        except Exception:
+        # Build list of (ts, value) for all valid numeric points in the day.
+        points: List[tuple[int, float]] = []
+        for p in series:
+            try:
+                val = float(p.get("value"))
+            except Exception:
+                continue
+            ts = p.get("ts")
+            if isinstance(ts, (int, float)):
+                points.append((int(ts), val))
+
+        if not points:
             rows.append(
                 DailyConsumptionRow(
                     device_id=did,
@@ -200,17 +261,41 @@ def daily_consumption(
             )
             continue
 
-        # Compute delta and round to 2 decimal places to avoid
-        # long floating point tails like 0.0799999999998.
-        delta = end_val - start_val
-        reset = delta < 0
-        if reset:
-            delta = 0.0
-        else:
-            delta = round(delta, 2)
+        # Start/end values from first/last valid point in the day.
+        start_ts, start_val = points[0]
+        end_ts, end_val = points[-1]
 
-        start_ts = first.get("ts")
-        end_ts = last.get("ts")
+        # Determine an effective max counter for wrap-around segments.
+        # Priority:
+        # 1) Explicit TOTAL_CONSUMPTION_MAX from env (if provided)
+        # 2) Auto-detected power-of-10 above the largest observed value
+        max_observed = max(v for _, v in points)
+        # Avoid log math; just use power of 10 >= integer digits of max_observed
+        try:
+            digits = max(1, len(str(int(abs(max_observed)))))
+        except Exception:
+            digits = 6  # sane fallback
+        auto_max_counter = float(10 ** digits)
+        effective_max = (
+            MAX_COUNTER if MAX_COUNTER is not None and MAX_COUNTER > 0 else auto_max_counter
+        )
+
+        # Walk through all consecutive points in the day to compute usage,
+        # correctly handling wrap-around counters.
+        total_delta = 0.0
+        reset = False
+        for i in range(1, len(points)):
+            prev_ts, prev_val = points[i - 1]
+            curr_ts, curr_val = points[i]
+            if curr_val >= prev_val:
+                total_delta += curr_val - prev_val
+            else:
+                # Counter dropped: treat as wrap-around.
+                reset = True
+                total_delta += (effective_max - prev_val) + curr_val
+
+        # Round to 2 decimal places to avoid long floating tails.
+        delta = round(total_delta, 2) if total_delta > 0 else 0.0
         start_ts_iso: Optional[str] = None
         end_ts_iso: Optional[str] = None
         if isinstance(start_ts, (int, float)):

@@ -13,7 +13,7 @@ export const DownloadPage: React.FC = () => {
   // Fixed output: CSV + pivot layout
   const format: FormatOption = "csv";
   const layout: LayoutOption = "pivot";
-  const [keys, setKeys] = useState<string>("flow_rate,total_consumption");
+  const FIXED_KEYS = "flow_rate,total_consumption";
   const [deviceIds, setDeviceIds] = useState<string>("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
@@ -39,7 +39,7 @@ export const DownloadPage: React.FC = () => {
     const params = new URLSearchParams();
     params.set("format", format);
     params.set("layout", layout);
-    if (keys.trim()) params.set("keys", keys.trim());
+    params.set("keys", FIXED_KEYS);
     if (startDate && endDate) {
       params.set("start_date", startDate);
       params.set("end_date", endDate);
@@ -78,7 +78,12 @@ export const DownloadPage: React.FC = () => {
       const blob = await resp.blob();
       const disposition = resp.headers.get("Content-Disposition") || "";
       const match = disposition.match(/filename=\"?([^\";]+)\"?/i);
-      const filename = match ? match[1] : (format === "csv" ? "thingsboard_telemetry.csv" : "thingsboard_telemetry.json");
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const defaultName =
+        format === "csv"
+          ? `AntarIoT_Flow_Meter_report_${today}${layout === "pivot" ? "_pivot" : ""}.csv`
+          : `AntarIoT_Flow_Meter_report_${today}.json`;
+      const filename = match ? match[1] : defaultName;
 
       const link = document.createElement("a");
       link.href = window.URL.createObjectURL(blob);
@@ -102,9 +107,6 @@ export const DownloadPage: React.FC = () => {
     const preset = presets.find(p => p.id === presetId);
     if (!preset) return;
     setDeviceIds(preset.device_ids.join(","));
-    if (preset.keys) {
-      setKeys(preset.keys);
-    }
   };
 
   const onSavePreset = async () => {
@@ -127,7 +129,7 @@ export const DownloadPage: React.FC = () => {
       const created = await createDevicePreset({
         name,
         device_ids: ids,
-        keys: keys.trim()
+        keys: FIXED_KEYS
       });
       const next = [...presets, created].sort((a, b) =>
         a.name.localeCompare(b.name)
@@ -194,14 +196,6 @@ export const DownloadPage: React.FC = () => {
                 placeholder="0f32...,43cd..."
                 value={deviceIds}
                 onChange={e => setDeviceIds(e.target.value)}
-              />
-            </label>
-            <label>
-              Keys
-              <input
-                value={keys}
-                onChange={e => setKeys(e.target.value)}
-                placeholder="flow_rate,total_consumption"
               />
             </label>
             <label>

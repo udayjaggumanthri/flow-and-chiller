@@ -37,6 +37,8 @@ body {
 }
 
 .nav-item {
+  display: flex;
+  align-items: center;
   border: none;
   border-radius: 0.5rem;
   padding: 0.6rem 0.8rem;
@@ -45,16 +47,20 @@ body {
   text-align: left;
   cursor: pointer;
   font-size: 0.95rem;
-  transition: background 0.15s ease, color 0.15s ease;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
 }
 
 .nav-item:hover {
   background: rgba(37, 99, 235, 0.06);
+  color: #1d4ed8;
+  transform: translateX(2px);
 }
 
 .nav-item.active {
-  background: #2563eb;
+  background: linear-gradient(90deg, #1d4ed8, #2563eb);
   color: #ffffff;
+  box-shadow: 0 6px 14px rgba(37, 99, 235, 0.3);
 }
 
 .content {

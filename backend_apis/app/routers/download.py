@@ -200,6 +200,10 @@ async def download_thingsboard(
         raise HTTPException(status_code=400, detail="layout=pivot is only supported for format=csv")
 
     is_multi = isinstance(data, list)
+
+    # Use download date in filenames so users can easily identify when a report was generated.
+    # Format: YYYY-MM-DD (local server date).
+    download_date = datetime.now().strftime("%Y-%m-%d")
     if fmt == "csv":
         if lay == "pivot":
             # Pivot layout requires multi-device data. For single device, wrap to reuse pivot formatter.
@@ -224,14 +228,14 @@ async def download_thingsboard(
                 device_labels=labels if labels else None,
                 keys=key_list,
             )
-            filename = "thingsboard_telemetry_pivot.csv"
+            filename = f"AntarIoT_Flow_Meter_report_{download_date}_pivot.csv"
         else:
             content = multi_device_timeseries_to_csv(data) if is_multi else timeseries_to_csv(data)
-            filename = "thingsboard_telemetry.csv"
+            filename = f"AntarIoT_Flow_Meter_report_{download_date}.csv"
         media_type = "text/csv"
     else:
         content = multi_device_timeseries_to_json(data) if is_multi else timeseries_to_json(data)
-        filename = "thingsboard_telemetry.json"
+        filename = f"AntarIoT_Flow_Meter_report_{download_date}.json"
         media_type = "application/json"
 
     return Response(

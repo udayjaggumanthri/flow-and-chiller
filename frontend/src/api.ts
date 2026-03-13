@@ -151,12 +151,16 @@ export async function fetchDailyConsumption(params: {
   preset_id?: number;
   device_ids?: string;
   key?: string;
+  start_iso?: string;
+  end_iso?: string;
 }): Promise<DailyConsumptionRow[]> {
   const qs = new URLSearchParams();
   qs.set("date", params.date);
   if (params.preset_id !== undefined) qs.set("preset_id", String(params.preset_id));
   if (params.device_ids) qs.set("device_ids", params.device_ids);
   if (params.key) qs.set("key", params.key);
+  if (params.start_iso) qs.set("start_iso", params.start_iso);
+  if (params.end_iso) qs.set("end_iso", params.end_iso);
   const res = await fetch(`${API_BASE_URL}/reports/daily-consumption?${qs.toString()}`);
   return handleJson<DailyConsumptionRow[]>(res);
 }

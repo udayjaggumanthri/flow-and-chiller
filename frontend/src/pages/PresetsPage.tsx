@@ -3,10 +3,16 @@ import {
   DevicePreset,
   fetchDevicePresets,
   createDevicePreset,
-  deleteDevicePreset
+  deleteDevicePreset,
+  verifySettingsPin,
+  isSettingsUnlocked,
+  setSettingsUnlocked
 } from "../api";
 
 export const PresetsPage: React.FC = () => {
+  const [unlocked, setUnlocked] = useState(isSettingsUnlocked);
+  const [pin, setPin] = useState("");
+  const [pinError, setPinError] = useState<string | null>(null);
   const [presets, setPresets] = useState<DevicePreset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,9 +34,39 @@ export const PresetsPage: React.FC = () => {
     }
   };
 
+  // Same PIN gate as Settings page.
+  // If SETTINGS_PIN is not configured on the backend, verifySettingsPin("")
+  // returns 200 and we auto-unlock. If it is configured, this returns 401
+  // and we show the PIN form.
   useEffect(() => {
+    if (unlocked) return;
+    (async () => {
+      try {
+        await verifySettingsPin("");
+        setSettingsUnlocked(true);
+        setUnlocked(true);
+      } catch {
+        setSettingsUnlocked(false);
+      }
+    })();
+  }, [unlocked]);
+
+  useEffect(() => {
+    if (!unlocked) return;
     loadPresets();
-  }, []);
+  }, [unlocked]);
+
+  const onPinSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError(null);
+    try {
+      await verifySettingsPin(pin);
+      setSettingsUnlocked(true);
+      setUnlocked(true);
+    } catch (e: any) {
+      setPinError(e.message || "Invalid PIN");
+    }
+  };
 
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,6 +112,34 @@ export const PresetsPage: React.FC = () => {
       setError(e.message || String(e));
     }
   };
+
+  if (!unlocked) {
+    return (
+      <div className="page">
+        <h2>Device presets</h2>
+        <div className="card pin-gate">
+          <p>Enter PIN to manage device presets.</p>
+          <form onSubmit={onPinSubmit}>
+            <label>
+              PIN
+              <input
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="Enter PIN"
+                value={pin}
+                onChange={e => setPin(e.target.value)}
+              />
+            </label>
+            {pinError && <div className="message error">{pinError}</div>}
+            <div className="form-footer">
+              <button type="submit">Continue</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page">

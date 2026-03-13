@@ -42,6 +42,28 @@ export const DailyConsumptionPage: React.FC = () => {
   const [deviceIds, setDeviceIds] = useState<string>("");
   const [rangeStart, setRangeStart] = useState<string>(today);
   const [rangeEnd, setRangeEnd] = useState<string>(today);
+  const [windowStartLocal, setWindowStartLocal] = useState<string>(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    const ss = String(d.getSeconds()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`;
+  });
+  const [windowEndLocal, setWindowEndLocal] = useState<string>(() => {
+    const d = new Date();
+    d.setHours(23, 59, 59, 0);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    const ss = String(d.getSeconds()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`;
+  });
   const [dlStatus, setDlStatus] = useState<string | null>(null);
   const [dlError, setDlError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
@@ -49,7 +71,24 @@ export const DailyConsumptionPage: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const data = await fetchDailyConsumption({ date: today });
+      // Convert local datetime window to ISO UTC strings for the backend.
+      const startIso =
+        windowStartLocal && !Number.isNaN(Date.parse(windowStartLocal))
+          ? new Date(windowStartLocal).toISOString()
+          : undefined;
+      const endIso =
+        windowEndLocal && !Number.isNaN(Date.parse(windowEndLocal))
+          ? new Date(windowEndLocal).toISOString()
+          : undefined;
+
+      const baseDate =
+        windowStartLocal?.slice(0, 10) || today;
+
+      const data = await fetchDailyConsumption({
+        date: baseDate,
+        start_iso: startIso,
+        end_iso: endIso
+      });
       setRows(data);
       setError(null);
     } catch (e: any) {
@@ -200,9 +239,34 @@ export const DailyConsumptionPage: React.FC = () => {
 
       <section className="card" style={{ maxWidth: 960 }}>
         <h3>Daily consumption (all devices)</h3>
+        <div className="form-grid" style={{ gridTemplateColumns: "1.2fr 1.2fr auto" }}>
+          <label>
+            From (local time)
+            <input
+              type="datetime-local"
+              step={1}
+              value={windowStartLocal}
+              onChange={e => setWindowStartLocal(e.target.value)}
+            />
+          </label>
+          <label>
+            To (local time)
+            <input
+              type="datetime-local"
+              step={1}
+              value={windowEndLocal}
+              onChange={e => setWindowEndLocal(e.target.value)}
+            />
+          </label>
+          <div style={{ alignSelf: "flex-end" }}>
+            <button type="button" onClick={loadData} disabled={loading}>
+              {loading ? "Loading…" : "Apply window"}
+            </button>
+          </div>
+        </div>
         <p style={{ marginBottom: "1rem", color: "#64748b" }}>
-          Automatically showing daily consumption for <strong>{today}</strong> (UTC) for
-          all devices configured in Settings.
+          Showing consumption for devices configured in Settings between the selected
+          start and end times. Times in the table are actual sample times in IST.
         </p>
 
         {loading && <div className="message info">Loading daily consumption…</div>}
