@@ -45,6 +45,63 @@ pip install -r requirements.txt
 
 ---
 
+## Database setup on a new system
+
+The React frontend does not have its own database; it uses the **Postgres database configured for the backend**.  
+On any new machine, follow these steps once to create the required tables.
+
+### 1. Create the Postgres database
+
+In Postgres (psql / pgAdmin), create the database that matches your `.env` / defaults:
+
+- `DB_NAME = tb_setup_db`
+- `DB_USER = postgres`
+- `DB_PASSWORD = postgres`
+- `DB_HOST = localhost`
+- `DB_PORT = 5432`
+
+Example with `psql`:
+
+```bash
+createdb tb_setup_db
+```
+
+### 2. Configure connection in `.env`
+
+In `backend_apis/.env` on the new machine, make sure these values match your Postgres instance:
+
+```env
+DB_USER=postgres
+DB_PASSWORD=postgres
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=tb_setup_db
+```
+
+### 3. Install dependencies and create tables
+
+From **PowerShell**:
+
+```powershell
+cd "g:\scripts_to_api\backend_apis"
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# ONE-TIME ONLY: create all tables in the configured database
+python -c "from app.db import Base, engine; import app.models.db_models; Base.metadata.create_all(bind=engine)"
+```
+
+This last command:
+
+- Uses the DB settings from `.env` (or defaults in `app/db.py`).
+- Imports all SQLAlchemy models in `app/models/db_models.py`.
+- Calls `Base.metadata.create_all(bind=engine)` to create the `system_settings` and `device_presets` tables (and any future models) in Postgres.
+
+After this, you can run the backend normally.
+
+---
+
 ## Configuration (`.env`)
 
 Backend reads configuration in this priority order:

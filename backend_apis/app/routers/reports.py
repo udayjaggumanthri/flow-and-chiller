@@ -82,17 +82,11 @@ class DailyConsumptionRow(BaseModel):
 @router.get("/daily-consumption", response_model=List[DailyConsumptionRow])
 def daily_consumption(
     date: str = Query(..., description="Base day (YYYY-MM-DD) used for grouping."),
-    start_iso: Optional[str] = Query(
-        None,
-        description=(
-            "Optional ISO8601 start timestamp (UTC). "
-            "If provided together with end_iso, restricts the computation window."
-        ),
-    ),
-    end_iso: Optional[str] = Query(
-        None,
-        description="Optional ISO8601 end timestamp (UTC). Must be provided with start_iso.",
-    ),
+    # Optional ISO8601 start/end timestamps (UTC). We intentionally do NOT wrap
+    # these in fastapi.Query so that internal calls (e.g. from the CSV endpoint)
+    # receive `None` as the default instead of a Query object.
+    start_iso: Optional[str] = None,
+    end_iso: Optional[str] = None,
     preset_id: Optional[int] = Query(
         None, description="Optional device preset id to use for device_ids/keys."
     ),
