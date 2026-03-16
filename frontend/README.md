@@ -44,6 +44,24 @@ npm run dev
 Open:
 - `http://localhost:5173`
 
+To expose the dev server on your local network so other devices on the same Wi‑Fi/LAN can access it:
+
+```bash
+cd frontend
+npm run dev -- --host 0.0.0.0
+```
+
+Then, on this Windows machine, find your local IPv4 address:
+
+```powershell
+ipconfig
+```
+
+Look under the active network adapter for `IPv4 Address`, e.g. `192.168.0.42`.  
+Other devices on the same network can then open:
+
+- `http://192.168.0.42:5173`
+
 ---
 
 ## Build (production)
